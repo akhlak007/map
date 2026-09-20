@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#07110f" />
+  <title>EchoPath — Sonar Map Studio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="EchoPath home">
+      <span class="brand-mark"><i></i><i></i><i></i></span>
+      <span><b>ECHOPATH</b><small>SONAR MAP STUDIO</small></span>
+    </a>
+    <div class="status"><span class="status-dot"></span><span id="systemStatus">SYSTEM READY</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">UGRV / ENVIRONMENT RECONSTRUCTION</p>
+        <h1>Turn sonar logs into<br><em>spatial intelligence.</em></h1>
+        <p class="lede">Upload a left/right distance log to reconstruct a clean, vehicle-relative plan view of the route, obstacles, and clearance.</p>
+      </div>
+      <label class="upload-card" id="dropZone">
+        <input id="fileInput" type="file" accept=".csv,text/csv" />
+        <span class="upload-icon">↥</span>
+        <span><strong>DROP SONAR CSV</strong><small>or click to choose a file</small></span>
+        <span class="file-pill">CSV</span>
+      </label>
+    </section>
+
+    <section class="workspace" id="workspace">
+      <aside class="panel controls-panel">
+        <div class="panel-heading"><span>MISSION LOG</span><button class="icon-button" id="reloadButton" title="Choose another file">↻</button></div>
+        <div class="file-info">
+          <span class="file-type">CSV</span>
+          <div><strong id="fileName">Waiting for data</strong><small id="fileMeta">Upload a sonar log to begin</small></div>
+        </div>
+
+        <div class="divider"></div>
+        <label class="field-label" for="speedInput"><span>ESTIMATED VEHICLE SPEED</span><output id="speedValue">0.05 m/s</output></label>
+        <input id="speedInput" type="range" min="0.01" max="0.50" step="0.01" value="0.05" />
+        <p class="hint">Used only to estimate route length because the CSV has no odometry.</p>
+
+        <label class="field-label" for="rangeInput"><span>DISPLAY RANGE</span><output id="rangeValue">Auto</output></label>
+        <input id="rangeInput" type="range" min="0" max="200" step="5" value="0" />
+
+        <label class="field-label" for="aspectInput"><span>CORRIDOR WIDTH ZOOM</span><output id="aspectValue">3.0×</output></label>
+        <input id="aspectInput" type="range" min="1" max="10" step="0.5" value="3.0" />
+        <p class="hint">Expands corridor width so walls, obstacles & bottlenecks are easily visible.</p>
+
+        <div class="divider"></div>
+        <div class="toggle-row"><span><b>FOLLOW VEHICLE</b><small>Keep vehicle centered</small></span><button id="followToggle" class="toggle active" role="switch" aria-checked="true"><i></i></button></div>
+        <div class="toggle-row"><span><b>SMOOTH PATH</b><small>Reduce sensor noise</small></span><button id="smoothToggle" class="toggle active" role="switch" aria-checked="true"><i></i></button></div>
+        <div class="toggle-row"><span><b>CONNECT RETURNS</b><small>Show inferred boundaries</small></span><button id="connectToggle" class="toggle active" role="switch" aria-checked="true"><i></i></button></div>
+        <div class="toggle-row"><span><b>HIGHLIGHT HAZARDS</b><small>Flag narrow bottlenecks &lt;30cm</small></span><button id="hazardToggle" class="toggle active" role="switch" aria-checked="true"><i></i></button></div>
+
+        <div class="notice"><span>i</span><p><b>RELATIVE MAP</b>Forward motion is reconstructed from timestamps & vehicle speed. Drag map to pan, scroll to zoom, click track to seek.</p></div>
+      </aside>
+
+      <section class="map-shell">
+        <div class="map-toolbar">
+          <div><span class="live-dot"></span><b>PLAN VIEW</b><small id="sampleCounter">NO DATA</small></div>
+          <div class="map-toolbar-actions">
+            <span class="zoom-pill" id="zoomLevelDisplay">100%</span>
+            <div class="legend"><span><i class="dot near"></i>Near</span><span><i class="dot mid"></i>Medium</span><span><i class="dot far"></i>Far</span></div>
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="mapCanvas" aria-label="Sonar plan map"></canvas>
+          
+          <!-- Floating Map HUD Controls -->
+          <div class="map-hud-controls">
+            <button class="hud-btn" id="zoomInBtn" title="Zoom In (+)" aria-label="Zoom In">+</button>
+            <button class="hud-btn" id="zoomOutBtn" title="Zoom Out (-)" aria-label="Zoom Out">−</button>
+            <div class="hud-separator"></div>
+            <button class="hud-btn" id="fitViewBtn" title="Fit Entire Route (Overview)" aria-label="Fit View">⛶</button>
+            <button class="hud-btn" id="centerVehicleBtn" title="Center on Vehicle" aria-label="Center on Vehicle">🎯</button>
+            <button class="hud-btn" id="resetZoomBtn" title="Reset Zoom (100%)" aria-label="Reset Zoom">1:1</button>
+          </div>
+
+          <!-- Hover Tooltip -->
+          <div class="map-tooltip" id="mapTooltip">
+            <div class="tooltip-header"><span id="ttSample">SAMPLE #0</span><span id="ttTime">--:--:--</span></div>
+            <div class="tooltip-body">
+              <div><span>Left:</span><strong id="ttLeft">—</strong></div>
+              <div><span>Right:</span><strong id="ttRight">—</strong></div>
+              <div><span>Clearance:</span><strong id="ttClearance">—</strong></div>
+              <div><span>Distance:</span><strong id="ttDist">—</strong></div>
+            </div>
+            <div class="tooltip-status" id="ttStatus">NORMAL CLEARANCE</div>
+          </div>
+
+          <!-- Minimap Navigator -->
+          <div class="map-minimap" id="mapMinimap">
+            <span class="minimap-title">ROUTE OVERVIEW</span>
+            <canvas id="minimapCanvas" width="80" height="140"></canvas>
+            <div class="minimap-viewbox" id="minimapViewbox"></div>
+          </div>
+
+          <div class="empty-state" id="emptyState"><div class="scanner"><i></i></div><strong>NO SONAR LOG LOADED</strong><span>Upload a CSV to initialize the map</span></div>
+          <div class="map-scale" id="mapScale"><span id="rangeTop">—</span><i></i><span>0 m (Start)</span></div>
+          <div class="orientation"><span>N</span><i></i></div>
+        </div>
+        <div class="playbar">
+          <button id="playButton" class="play-button" aria-label="Play scan" disabled>▶</button>
+          <span id="currentTime">--:--:--</span>
+          <input id="timeline" type="range" min="0" max="0" value="0" disabled />
+          <span id="endTime">--:--:--</span>
+          <button class="speed-button" id="playbackSpeed">1×</button>
+        </div>
+      </section>
+
+      <aside class="panel data-panel">
+        <div class="panel-heading"><span>LIVE RETURN</span><span class="pulse-label">● ACTIVE</span></div>
+        <div class="radar-card"><canvas id="radarCanvas"></canvas><div class="radar-center"><b id="radarIndex">—</b><small>SAMPLE</small></div></div>
+        <div class="sensor-readouts">
+          <div><span><i class="sensor left"></i>LEFT</span><strong id="leftValue">—<small>cm</small></strong></div>
+          <div><span><i class="sensor right"></i>RIGHT</span><strong id="rightValue">—<small>cm</small></strong></div>
+        </div>
+        <div class="clearance-card"><span>AVAILABLE CLEARANCE</span><strong id="clearanceValue">— <small>cm</small></strong><div class="clearance-track"><i id="clearanceBar"></i></div><small id="clearanceStatus">WAITING FOR DATA</small></div>
+        <div class="stats-grid">
+          <div><span>SAMPLES</span><b id="statSamples">—</b></div>
+          <div><span>DURATION</span><b id="statDuration">—</b></div>
+          <div><span>ROUTE EST.</span><b id="statDistance">—</b></div>
+          <div><span>MIN GAP</span><b id="statMin">—</b></div>
+        </div>
+      </aside>
+    </section>
+  </main>
+  <footer><span>ECHOPATH / LOCAL PROCESSING</span><span>YOUR SENSOR DATA NEVER LEAVES THIS DEVICE</span></footer>
+  <script src="demo-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

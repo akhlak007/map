@@ -1,0 +1,8 @@
+{
+  "name": "echopath-sonar-map-studio",
+  "version": "1.0.0",
+  "description": "EchoPath Sonar Map Studio",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
